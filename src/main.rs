@@ -1,28 +1,32 @@
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, BufReader, prelude::*};
+use std::thread;
+use std::thread::JoinHandle;
 
-fn main() {
-    let mut buf: Vec<u8> = vec![];
-    // read file
-    let mut f = match File::open("foo.txt") {
-        Ok(file) => file,
-        Err(error) => {
-            panic!("Problem opening the file: {:?}", error)
-        }
-    };
-    let mut _pos: u32 = 0;
-    while buf.len() != 0 {
-        println!("buf: {:?}", buf);
+fn main() -> io::Result<()> {
+    let file = File::open("sgb-words.txt")?;
+    let reader = BufReader::new(file);
+    let mut this_chunk: Vec<String> = vec![];
+    let mut handles: Vec<JoinHandle<()>> = vec![];
 
-        match f.read(&mut buf)
-        {
-            Ok(n) => {
-                println!("read {} bytes", n);
-                _pos += n as u32;
-            },
-            Err(error) => {
-                panic!("Problem reading the file: {:?}", error)
+    let lines = reader.lines();
+    for (i, line) in lines.enumerate() {
+        match i % 100 {
+            0 => {
+                handles.push(thread::spawn(move || {
+                    for (j, word) in (&this_chunk).clone().iter().enumerate() {
+                        println!("{}: {}", j, word);
+                    }
+                }));
+                this_chunk = vec![];
             }
+            _ => { this_chunk.push(line?); }
         }
     }
+
+    for handle in handles {
+        let _ = handle.join();
+    }
+
+    Ok(())
 }
